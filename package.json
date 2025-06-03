@@ -1,0 +1,25 @@
+{
+  "name": "pdf-backend",
+  "version": "1.0.0",
+  "description": "Backend service for PDF generation with JWT auth",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "Node.js",
+    "Express",
+    "JWT",
+    "PDF",
+    "pdfkit"
+  ],
+  "author": "Your Name",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.13.0"
+  }
+}
