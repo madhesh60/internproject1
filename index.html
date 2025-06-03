@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PDF Generator Service</h1>
+
+        <div id="login-section">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" value="user" required class="focus:ring focus:ring-blue-200">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" value="password" required class="focus:ring focus:ring-blue-200">
+                </div>
+                <button type="submit" class="w-full">Login</button>
+            </form>
+            <div id="login-message" class="message hidden"></div>
+        </div>
+
+        <div id="pdf-section" class="hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Generate PDF</h2>
+            <div id="auth-status" class="message success mb-4">
+                You are logged in as <span id="logged-in-user" class="font-bold"></span>.
+            </div>
+            <form id="pdf-form">
+                <div class="form-group">
+                    <label for="pdf-content">Content for PDF:</label>
+                    <textarea id="pdf-content" name="pdf-content" rows="10" class="focus:ring focus:ring-blue-200" placeholder="Type your content here"></textarea>
+                </div>
+                <button type="submit" class="w-full">Generate PDF</button>
+            </form>
+            <div id="pdf-message" class="message hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('login-form');
+        const pdfForm = document.getElementById('pdf-form');
+        const loginSection = document.getElementById('login-section');
+        const pdfSection = document.getElementById('pdf-section');
+        const loginMessage = document.getElementById('login-message');
+        const pdfMessage = document.getElementById('pdf-message');
+        const loggedInUserSpan = document.getElementById('logged-in-user');
+
+        const BACKEND_URL = 'http://localhost:3000'; 
+        let jwtToken = localStorage.getItem('jwtToken'); 
+        let currentUsername = localStorage.getItem('username'); 
+
+        function showMessage(messageDiv, text, isSuccess) {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${isSuccess ? 'success' : 'error'}`;
+            messageDiv.classList.remove('hidden');
+        }
+
+        function updateUI() {
+            if (jwtToken && currentUsername) {
+                loginSection.classList.add('hidden');
+                pdfSection.classList.remove('hidden');
+                loggedInUserSpan.textContent = currentUsername;
+                showMessage(loginMessage, `Successfully logged in as ${currentUsername}.`, true);
+            } else {
+                loginSection.classList.remove('hidden');
+                pdfSection.classList.add('hidden');
+                showMessage(loginMessage, 'Please log in to generate PDFs.', false);
+            }
+        }
+
+       loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const username = e.target.username.value;
+    const password = e.target.password.value;
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            jwtToken = data.accessToken;
+            currentUsername = username;
+            localStorage.setItem('jwtToken', jwtToken);
+            localStorage.setItem('username', currentUsername);
+            showMessage(loginMessage, 'Login successful!', true);
+            updateUI();
+        } else {
+            const errorText = await response.text();
+            showMessage(loginMessage, `Login failed: ${errorText}`, false);
+            jwtToken = null;
+            currentUsername = null;
+            localStorage.removeItem('jwtToken');
+            localStorage.removeItem('username');
+            updateUI();
+        }
+    } catch (error) {
+        console.error('Error during login:', error);
+        showMessage(loginMessage, 'Network error or server unavailable. Please try again.', false);
+        jwtToken = null;
+        currentUsername = null;
+        localStorage.removeItem('jwtToken');
+        localStorage.removeItem('username');
+        updateUI();
+    }
+});
+
+pdfForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!jwtToken) {
+        showMessage(pdfMessage, 'You are not logged in. Please log in first.', false);
+        updateUI();
+        return;
+    }
+
+    const content = e.target['pdf-content'].value;
+    if (!content.trim()) {
+        showMessage(pdfMessage, 'Please enter some content for the PDF.', false);
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/generate-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${jwtToken}`
+            },
+            body: JSON.stringify({ content })
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'generated_document.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            showMessage(pdfMessage, 'PDF generated and downloaded successfully!', true);
+        } else if (response.status === 401 || response.status === 403) {
+            showMessage(pdfMessage, 'Session expired or unauthorized. Please log in again.', false);
+            jwtToken = null;
+            currentUsername = null;
+            localStorage.removeItem('jwtToken');
+            localStorage.removeItem('username');
+            updateUI();
+        } else {
+            const errorText = await response.text();
+            showMessage(pdfMessage, `PDF generation failed: ${errorText}`, false);
+        }
+    } catch (error) {
+        console.error('Error during PDF generation:', error);
+        showMessage(pdfMessage, 'Network error or server unavailable. Please try again.', false);
+    }
+});
+        updateUI();
+    </script>
+</body>
+</html>
